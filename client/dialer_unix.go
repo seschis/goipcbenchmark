@@ -1,3 +1,5 @@
+// +build !windows
+
 package main
 
 import (
@@ -14,4 +16,3 @@ func makeConn() (net.Conn, error) {
 
 	return c, nil
 }
-

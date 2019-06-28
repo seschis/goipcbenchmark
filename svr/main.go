@@ -28,7 +28,7 @@ func main() {
 var pong = [...]byte{0, 1, 2, 3}
 
 func handleConn(conn net.Conn) {
-	b := make([]byte, 4096)
+	b := make([]byte, 32768)
 
 	//fmt.Printf("got a connection!\n")
 
@@ -49,10 +49,10 @@ func handleConn(conn net.Conn) {
 			if err != nil {
 				log.Fatalf("bad read: %v", err)
 			}
-			//fmt.Printf("read %v bytes of data [%v]\n", in_sz, b[0:in_sz])
+			n += in_sz
+			//fmt.Printf("read %v bytes (%v of %v read)\n", in_sz, n, size)
 			// XXX: ignore b since I only care about the transfer happending
 
-			n += in_sz
 		}
 
 		// After recieving the ping data, we have to respond with pong.

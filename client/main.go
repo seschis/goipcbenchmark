@@ -6,44 +6,66 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
 func main() {
-
-	fmt.Println("I'm the client")
-
+	var wg sync.WaitGroup
 	var number = flag.Int("n", 10000, "number of calls to make")
 	var ping_sz = flag.Int("s", 1024, "size of ping msg")
+	var concurrent = flag.Int("c", 1, "number of concurrent pings")
 
 	flag.Parse()
 
-	conn, err := makeConn()
-	if err != nil {
-		panic("error making conn")
-	}
-	defer conn.Close()
+	fmt.Printf("%v concurrent connections\n", *concurrent)
+	var ping = make([]byte, *ping_sz)
 
-	count := *number
-	start := time.Now()
-	for i := 0; i < count; i++ {
-		sendPing(conn, *ping_sz)
-	}
-	elapsed := time.Since(start)
-	fmt.Printf("%v ops. elapsed %s per op\n", count, elapsed/time.Duration(count))
-}
-
-func sendPing(conn net.Conn, ping_sz int) {
-	ping := make([]byte, ping_sz)
-
-	binary.LittleEndian.PutUint32(ping, 4)
+	binary.LittleEndian.PutUint32(ping, uint32(*ping_sz-4))
 
 	for i := 4; i < cap(ping); i++ {
 		ping[i] = byte(i)
 	}
 
+	var totalstart = time.Now()
+
+	for i := 0; i < *concurrent; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			fmt.Printf("thread[%v] started\n", id)
+
+			conn, err := makeConn()
+			if err != nil {
+				panic("error making conn")
+			}
+			defer conn.Close()
+
+			var count = int(*number / (*concurrent))
+			var start = time.Now()
+			for j := 0; j < count; j++ {
+				sendPing(conn, ping)
+			}
+			elapsed := time.Since(start)
+			fmt.Printf("thread[%v] %v ops. elapsed %s per op\n", id, count, elapsed/time.Duration(count))
+		}(i)
+	}
+	wg.Wait()
+	var totalelapsed = time.Since(totalstart)
+	fmt.Printf("total %v ops. total time %s, total elapsed %s per op", *number, totalelapsed, totalelapsed/time.Duration(*number))
+}
+
+func sendPing(conn net.Conn, ping []byte) {
+	//ping := make([]byte, ping_sz)
+
+	//binary.LittleEndian.PutUint32(ping, uint32(ping_sz-4))
+
+	//for i := 4; i < cap(ping); i++ {
+	//	ping[i] = byte(i)
+	//}
+
 	//fmt.Printf("sending ping [%v]\n", ping)
-	total_outn := 0
+	var total_outn int
 	for total_outn < len(ping) {
 		n, err := conn.Write(ping)
 		if err != nil {
